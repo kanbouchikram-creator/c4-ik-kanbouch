@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HTTP Client</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #fff; font-family: Arial, sans-serif; font-size: 14px; padding: 16px; color: #333; }
+  .row { display: flex; gap: 8px; margin-bottom: 10px; align-items: center; }
+  select, input, textarea, button {
+    font-family: Arial, sans-serif; font-size: 14px;
+    border: 1px solid #ccc; border-radius: 6px;
+    padding: 8px 10px; outline: none; background: #fff; color: #333;
+  }
+  select:focus, input:focus, textarea:focus { border-color: #888; }
+  select { width: 110px; cursor: pointer; }
+  input[type="text"] { flex: 1; }
+  button { background: #fff; cursor: pointer; white-space: nowrap; padding: 8px 18px; }
+  button:hover { background: #f5f5f5; }
+  #sendBtn { background: #333; color: #fff; border-color: #333; }
+  #sendBtn:hover { background: #555; }
+  .header-row { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+  .add-btn { width: 36px; height: 36px; padding: 0; font-size: 20px; text-align: center; flex-shrink: 0; }
+  textarea { width: 100%; height: 130px; resize: vertical; border-radius: 6px; padding: 10px; line-height: 1.5; }
+  hr { border: none; border-top: 2px solid #ddd; margin: 14px 0; }
+  #responseBody {
+    width: 100%; min-height: 130px; border: 1px solid #ccc; border-radius: 6px;
+    padding: 10px; background: #fafafa; white-space: pre-wrap; word-break: break-all;
+    line-height: 1.5; font-family: monospace; font-size: 13px;
+  }
+  #statusLine { margin-bottom: 8px; font-size: 13px; color: #555; display: none; }
+  .status-ok { color: green; font-weight: bold; }
+  .status-err { color: red; font-weight: bold; }
+</style>
+</head>
+<body>
+
+  <div class="row">
+    <select id="method">
+      <option>GET</option><option>POST</option><option>PUT</option>
+      <option>PATCH</option><option>DELETE</option>
+    </select>
+    <input type="text" id="url" placeholder="URL" />
+    <button id="sendBtn" onclick="sendRequest()">Envoyer</button>
+  </div>
+
+  <div class="row">
+    <input type="text" id="headerKey" placeholder="Header key" style="width:160px;flex:none" />
+    <input type="text" id="headerValue" placeholder="Header value" style="flex:1" />
+    <button class="add-btn" onclick="addHeader()" title="Ajouter">+</button>
+  </div>
+
+  <div id="extraHeaders"></div>
+
+  <textarea id="body" placeholder="Body"></textarea>
+
+  <hr>
+
+  <div id="statusLine"></div>
+  <div id="responseBody">Response body</div>
+
+<script>
+function addHeader() {
+  const k = document.getElementById('headerKey').value.trim();
+  const v = document.getElementById('headerValue').value.trim();
+  const row = document.createElement('div');
+  row.className = 'header-row';
+  row.innerHTML = `<input type="text" value="${esc(k)}" placeholder="Header key" style="width:160px;flex:none"/>
+    <input type="text" value="${esc(v)}" placeholder="Header value" style="flex:1"/>
+    <button class="add-btn" onclick="this.closest('.header-row').remove()">×</button>`;
+  document.getElementById('extraHeaders').appendChild(row);
+  document.getElementById('headerKey').value = '';
+  document.getElementById('headerValue').value = '';
+}
+
+function getHeaders() {
+  const h = {};
+  const k = document.getElementById('headerKey').value.trim();
+  const v = document.getElementById('headerValue').value.trim();
+  if (k) h[k] = v;
+  document.querySelectorAll('#extraHeaders .header-row').forEach(row => {
+    const inp = row.querySelectorAll('input');
+    if (inp[0].value.trim()) h[inp[0].value.trim()] = inp[1].value.trim();
+  });
+  return h;
+}
+
+async function sendRequest() {
+  const url = document.getElementById('url').value.trim();
+  const method = document.getElementById('method').value;
+  const bodyVal = document.getElementById('body').value.trim();
+  if (!url) { alert('Veuillez saisir une URL.'); return; }
+
+  const respEl = document.getElementById('responseBody');
+  const statusEl = document.getElementById('statusLine');
+  respEl.textContent = 'Chargement...';
+  statusEl.style.display = 'none';
+
+  const opts = { method, headers: getHeaders() };
+  if (!['GET','HEAD'].includes(method) && bodyVal) opts.body = bodyVal;
+
+  const t0 = Date.now();
+  try {
+    const resp = await fetch(url, opts);
+    const elapsed = Date.now() - t0;
+    const text = await resp.text();
+    statusEl.style.display = 'block';
+    statusEl.innerHTML = `Statut : <span class="${resp.ok?'status-ok':'status-err'}">${resp.status} ${resp.statusText}</span> &nbsp;|&nbsp; ${elapsed}ms`;
+    try { respEl.textContent = JSON.stringify(JSON.parse(text), null, 2); }
+    catch { respEl.textContent = text || '(réponse vide)'; }
+  } catch(err) {
+    statusEl.style.display = 'block';
+    statusEl.innerHTML = `<span class="status-err">Erreur : ${esc(err.message)}</span>`;
+    respEl.textContent = '';
+  }
+}
+
+document.getElementById('url').addEventListener('keydown', e => { if(e.key==='Enter') sendRequest(); });
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+</script>
+</body>
+</html>
